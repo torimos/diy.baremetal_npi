@@ -30,7 +30,9 @@ NM		= $(PREFIX)nm
 HDMP	= hexdump
 BLD		= $(TOOLS_DIR)/build
 
-INCLUDES 	+= -I$(INC_DIR)
+INCLUDES 	+= -I$(SRC_DIR) -I$(SRC_DIR)/**
+INCLUDES 	+= -I$(INC_DIR) -I$(INC_DIR)/**
+
 CFLAGS 		+= -g -Wall -fsigned-char -nostdlib -nostartfiles -ffreestanding \
 				-mlittle-endian -march=$(ARCH) -mtune=$(CPU)
 CCFLAGS 	+= $(CFLAGS) -std=c++14 -Wno-aligned-new
@@ -58,6 +60,6 @@ LDFLAGS += -Bstatic -T$(LINKERFILE) \
 			$(LIBS) $(EXTRALIBS) \
 			--end-group
 
-OBJS = $(patsubst $(SRC_DIR)/%, %.o, $(shell find $(SRC_DIR)/ -type f -name '*.*'))
+OBJS = $(patsubst $(SRC_DIR)/%, %.o, $(shell find $(SRC_DIR)/ -type f \( -iname "*.c" -o -name "*.cpp" -o -name "*.S" \)))
 DIRS = $(filter-out ./,$(sort $(dir $(OBJS))))
 
