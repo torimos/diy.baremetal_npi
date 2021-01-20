@@ -1,0 +1,1 @@
+%cd%/tools/bin/loader.exe -v -x %cd%/build/kernel8.img
