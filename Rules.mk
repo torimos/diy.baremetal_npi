@@ -1,21 +1,65 @@
-include $(HOME)/Common.mk
+include core/$(BOARD)/build_scripts/Rules.mk
+include BuildEnvironment.mk
+
+CC		= $(CC_PREFIX)gcc
+CXX		= $(CC_PREFIX)g++
+LD		= $(CC_PREFIX)ld
+CPY		= $(CC_PREFIX)objcopy
+DMP		= $(CC_PREFIX)objdump
+NM		= $(CC_PREFIX)nm
+
+ifeq ($(strip $(STDLIB_SUPPORT)),0)
+LIBGCC	  = "$(shell $(CC) $(CCFLAGS) -print-file-name=libgcc.a)"
+LIBC	  = "$(shell $(CC) $(CCFLAGS) -print-file-name=libc.a)"
+
+ifneq ($(strip $(LIBGCC)),"libgcc.a")
+EXTRALIBS += $(LIBGCC)
+endif
+
+ifneq ($(strip $(LIBC)),"libc.a")
+EXTRALIBS += $(LIBC)
+endif
+
+CCFLAGS += -fno-exceptions -fno-rtti -nostdinc++
+endif
+
+ifeq ($(strip $(STDLIB_SUPPORT)),1)
+LIBM = "$(shell $(CC) $(CCFLAGS) -print-file-name=libm.a)"
+ifneq ($(strip $(LIBM)),"libm.a")
+EXTRALIBS += $(LIBM)
+endif
+endif
+
+ifeq ($(strip $(GC_SECTIONS)),1)
+CFLAGS	+= -ffunction-sections -fdata-sections
+LDFLAGS	+= --gc-sections
+endif
+
+CFLAGS 	= -g -Wall -fsigned-char -nostdlib -nostartfiles -ffreestanding $(BOARD_CFLAGS)
+CCFLAGS = $(CFLAGS) -std=c++14 -Wno-aligned-new
+LDFLAGS += -Bstatic \
+			-T$(LINKER_DIR)/$(LINKERFILE) \
+			--start-group \
+			$(LIBS) \
+			$(EXTRALIBS) \
+			--end-group
+
+define COLLEC_OBJ
+$(foreach item,$(1),$(patsubst $(HOME)/$(item)/%,$(item)/%.o,$(shell find $(HOME)/$(item) -type f \( -iname "*.c" -o -name "*.cpp" -o -name "*.s" -o -name "*.S" \))))
+endef
+define COLLEC_INC
+$(foreach item,$(1),$(patsubst %,-I%,$(filter-out $(HOME),$(sort $(dir $(shell find $(HOME)/$(item) -type f \( -iname "*.h" -o -name "*.hpp" \)))))))
+endef
+
+OBJS 		= $(call COLLEC_OBJ,$(SOURCES))
+INCLUDES 	= $(call COLLEC_INC,$(SOURCES))
 
 %.S.o: %.S
-	@echo " [CC]   $<" 
+	@echo " [CC]    $<" 
 	@$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $(OBJ_DIR)/$@
 %.c.o: %.c
-	@echo " [CC]   $<" 
+	@echo " [CC]    $<" 
 	@$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $(OBJ_DIR)/$@
 %.cpp.o: %.cpp
 	@echo " [CXX]   $<" 
 	@$(CXX) $(CCFLAGS) $(INCLUDES) -c $< -o $(OBJ_DIR)/$@
-
-$(TARGET).img: $(OBJS)
-	@echo " [LD]   $(TARGET).elf"
-	@$(LD) -o $(BUILD_DIR)/$(TARGET).elf -Map $(BUILD_DIR)/$(TARGET).map $(patsubst %.o,$(OBJ_DIR)/%.o,$(OBJS)) $(LDFLAGS)
-	@echo " [IMG]  $(TARGET)_nonsih.img"
-	@$(CPY) $(BUILD_DIR)/$(TARGET).elf -O binary $(BUILD_DIR)/$(TARGET)_nonsih.img
-	@echo " [IMG]  $(TARGET).img"
-	@$(BLD) $(TOOLS_DIR)/nsih.bin $(BUILD_DIR)/$(TARGET)_nonsih.img $(BUILD_DIR)/$(TARGET).img
-	@echo " [DUMP]  $(TARGET).disasm"
-	@$(DMP) -l -S -D $(BUILD_DIR)/$(TARGET).elf > $(BUILD_DIR)/$(TARGET).disasm

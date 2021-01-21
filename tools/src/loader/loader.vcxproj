@@ -157,6 +157,11 @@
     <ClInclude Include="s5p_boot.h" />
     <ClInclude Include="s5p_usb.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="nsih64.bin">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</DeploymentContent>
+    </None>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

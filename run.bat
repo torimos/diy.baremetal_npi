@@ -1,1 +1,2 @@
-%cd%/tools/bin/loader.exe -v -x %cd%/build/kernel8.img
+cd %cd%/tools/bin/
+loader.exe -v -t64 %cd%/../../build/kernel8.img

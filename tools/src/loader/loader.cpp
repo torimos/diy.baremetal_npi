@@ -7,14 +7,14 @@
 #include "s5p_usb.h"
 #include "s5p_boot.h"
 
-#define BUF_MAX (50 * 1024 * 1024)
-
 #define MIN(A, B) (((A) < (B)) ? (A) : (B))
 
 typedef unsigned char uint8;
 typedef unsigned int  uint32;
 
-static unsigned char mem[BUF_MAX];
+static unsigned char mem[BOOT_LOADER_MAX_SIZE];
+
+static unsigned char nsih64[BOOT_LOADER_HEADER_SIZE];
 
 static void write32LE(uint8* addr, uint32 data)
 {
@@ -29,106 +29,59 @@ static unsigned read32LE(const uint8* addr)
     return addr[0] + (addr[1] << 8) + (addr[2] << 16) + (addr[3] << 24);
 }
 
-static void initBootloaderHeader(uint8* buf, int is64bitBoot,
-    unsigned size, unsigned loadAddr, unsigned launchAddr,
-    int bootMethod)
+static void initBootloaderHeader(uint8* buf, uint8* nsihbuf, unsigned headerType, unsigned size, unsigned loadAddr, unsigned launchAddr)
 {
-    static const unsigned arm64bootcode[15] = {
-        0xE59F0030, // ldr r0, =0xc0011000
-        0xE590113C, // ldr r1, [r0, #0x13c]
-        0xE3811A0F, // orr r1, r1, #0xf000
-        0xE580113C, // str r1, [r0, #0x13c]
-        0xE59F1024, // ldr r1, =#0x3fffc080  @ launchAddr >> 2
-        0xE5801140, // str r1, [r0, #0x140]
-        0xE5101D54, // ldr r1, [r0, #-0xd54] @ 0cx00102ac
-        0xE3811001, // orr r1, r1, #1
-        0xE5001D54, // str r1, [r0, #-0xd54] @ 0cx00102ac
-        0xE5901138, // ldr r1, [r0, #0x138]
-        0xE381160F, // orr r1, r1, #0xf00000
-        0xE5801138, // str r1, [r0, #0x138]
-        0xE320F003, // wfi
-        0xEAFFFFFE, // b   .
-        0xC0011000
-    };
     unsigned i;
-
-    if (is64bitBoot) {
-        for (i = 0; i < sizeof(arm64bootcode) / sizeof(arm64bootcode[0]); ++i)
-            write32LE(buf + 4 * i, arm64bootcode[i]);
-        write32LE(buf + 4 * i, launchAddr >> 2);
-        launchAddr = loadAddr;  // launch the CPU reset
+    if (headerType == 64)
+    {
+        for (i = 0; i < BOOT_LOADER_HEADER_SIZE; i++)
+            buf[i] = nsihbuf[i];
     }
-    write32LE(buf + 0x44, size);        // load size
-    write32LE(buf + 0x48, loadAddr);    // load address
-    write32LE(buf + 0x4c, launchAddr);  // launch address
-    if (bootMethod >= 0)
-        buf[0x57] = bootMethod;
-    memcpy(buf + 0x1fc, "NSIH", 4);     // signature
+    write32LE(buf + BOOT_LOADER_HEADER_SIZE_OFFSET, size - BOOT_LOADER_HEADER_SIZE);  // actual boot loader size
+    write32LE(buf + BOOT_LOADER_HEADER_LOADADDR_OFFSET, loadAddr);  // load address
+    write32LE(buf + BOOT_LOADER_HEADER_LAUNCHADDR_OFFSET, launchAddr);  // launch address
+    write32LE(buf + BOOT_LOADER_HEADER_BOOTMETHOD_OFFSET, 0);  // USB boot method
+    *(int*)(buf + BOOT_LOADER_HEADER_NSIH_OFFSET) = BOOT_LOADER_HEADER_NSIH;
 }
 
-static int checkBootloaderHeader(uint8* buf, unsigned readSize,
-    int isVerbose, int fixSize, int bootMethod)
+static int checkBootloaderHeader(uint8* buf, unsigned readSize, int isVerbose)
 {
-    static const char bootMethods[][6] = {
-        "USB", "SPI", "NAND", "SDMMC", "SDFS"
-    };
     unsigned size;
-    int res = !fixSize;
-    unsigned headerSize, sizeOffset, loadAddrOffset, launchAddrOffset;
-
-    headerSize = 512;
-    sizeOffset = 0x44;
-    loadAddrOffset = 0x48;
-    launchAddrOffset = 0x4c;
-    if (readSize >= headerSize) {
-        if (!memcmp(buf + 0x1fc, "NSIH", 4)) {
-            size = read32LE(buf + sizeOffset);
-            if (fixSize)
-                write32LE(buf + sizeOffset, readSize - headerSize);
-            if (bootMethod >= 0)
-                buf[0x57] = bootMethod;
+    int res = 0;
+    unsigned actualBootloaderSize = readSize - BOOT_LOADER_HEADER_SIZE;
+    if (readSize >= BOOT_LOADER_HEADER_SIZE) {
+        if (*(int*)(buf + BOOT_LOADER_HEADER_NSIH_OFFSET) == BOOT_LOADER_HEADER_NSIH) {
+            size = read32LE(buf + BOOT_LOADER_HEADER_SIZE_OFFSET);
             if (isVerbose) {
                 printf("Boot Header:\n");
                 printf("  size:           %u ", size);
-                if (size == readSize - headerSize)
+                if (size == actualBootloaderSize)
                     printf("(OK)\n");
                 else {
-                    printf("(real: %u%s)\n", readSize - headerSize,
-                        fixSize ? ", fixed" : "");
+                    printf("(real: %u)\n", actualBootloaderSize);
                 }
-                printf("  load address:   0x%x\n",
-                    read32LE(buf + loadAddrOffset));
-                printf("  launch address: 0x%x\n",
-                    read32LE(buf + launchAddrOffset));
-                bootMethod = ((unsigned char*)buf)[0x57];
-                printf("  boot method:    %d (%s)\n", bootMethod,
-                    bootMethod < 5 ? bootMethods[bootMethod] : "unknown");
+                printf("  load address:   0x%x\n", read32LE(buf + BOOT_LOADER_HEADER_LOADADDR_OFFSET));
+                printf("  launch address: 0x%x\n", read32LE(buf + BOOT_LOADER_HEADER_LAUNCHADDR_OFFSET));
+                unsigned char bootMethod = ((unsigned char*)buf)[BOOT_LOADER_HEADER_BOOTMETHOD_OFFSET];
+                printf("  boot method:    %d (%s)\n", bootMethod, bootMethod < 5 ? BOOT_METHODS[bootMethod] : "unknown");
                 printf("  signature:      OK\n");
             }
             else {
-                if (!fixSize && size != readSize - headerSize) {
-                    printf("warning: wrong load size in header: %u, real: %u\n",
-                        size, readSize - headerSize);
+                if (size != actualBootloaderSize) {
+                    printf("warning: wrong load size in header: %u, real: %u\n",size, actualBootloaderSize);
                 }
             }
             res = 1;
         }
-        else {
-            printf("%s: bad signature in header\n",
-                fixSize ? "error" : "warning");
-        }
     }
     else {
-        printf("%s: read data size (%u) is less than boot header size\n",
-            fixSize ? "error" : "warning", readSize);
+        printf("error: read data size (%u) is less than boot header size\n", readSize);
     }
     return res;
 }
 
-static int readBin(uint8* buf, unsigned bufsize, const char* filepath,
-    int isEnv)
+static int readBin(uint8* buf, unsigned bufsize, const char* filepath)
 {
-    enum { BUF_PADDING = 16 };
     FILE* fin;
     int size;
 
@@ -149,30 +102,35 @@ static int readBin(uint8* buf, unsigned bufsize, const char* filepath,
         fprintf(stderr, "fread: %s\n", strerror(errno));
         return size;
     }
-    if (isEnv && (unsigned)size < bufsize)
-        buf[size++] = '\0';
-    // Pad size to be a multiple of BUF_PADDING bytes
-    if (BUF_PADDING > 1)
-        size = ((size - 1) | (BUF_PADDING - 1)) + 1;
     return size;
 }
-//
-//static int hotplug_callback_attach(libusb_context* ctx, libusb_device* dev, libusb_hotplug_event event, void* user_data)
-//{
-//    (void)ctx; // unused
-//    (void)event; // unused
-//
-//    libusb_device_handle** dev_handle_ptr = (libusb_device_handle**)user_data;
-//    int ret;
-//
-//    ret = libusb_open(dev, dev_handle_ptr);
-//    if (LIBUSB_SUCCESS != ret) {
-//        fprintf(stderr, "libusb_open: %s\n", libusb_strerror(ret));
-//        return 0;
-//    }
-//
-//    return 1;
-//}
+
+static int outTofile(const char* fname, const unsigned char* data, unsigned size)
+{
+    FILE* fp;
+    int wr;
+
+    if (!strcmp(fname, "-"))
+        fp = stdout;
+    else {
+        fp = fopen(fname, "wb");
+        if (fp == NULL) {
+            perror(fname);
+            return 1;
+        }
+    }
+    while (size) {
+        if ((wr = fwrite(data, 1, size, fp)) < 0) {
+            perror("fwrite");
+            break;
+        }
+        data += wr;
+        size -= wr;
+    }
+    if (fp != stdout)
+        fclose(fp);
+    return size != 0;
+}
 
 static int device_open(libusb_context* ctx,
     libusb_device_handle** dev_handle_ptr, int isVerbose)
@@ -212,17 +170,6 @@ static int device_open(libusb_context* ctx,
     }
     printf("\n");
   
-    /* ret = libusb_hotplug_register_callback(ctx,
-        LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED, LIBUSB_HOTPLUG_ENUMERATE,
-        S5P6818_VID, S5P6818_PID, LIBUSB_HOTPLUG_MATCH_ANY,
-        (libusb_hotplug_callback_fn)hotplug_callback_attach, (void*)dev_handle_ptr, &hp);
-
-    if (LIBUSB_SUCCESS != ret) {
-        fprintf(stderr, "libusb_hotplug_register_callback: %s\n",
-            libusb_strerror(ret));
-        return ret;
-    }*/
-
     while (NULL == *dev_handle_ptr) {
         ret = libusb_handle_events(ctx);
         if (LIBUSB_SUCCESS != ret) {
@@ -232,7 +179,6 @@ static int device_open(libusb_context* ctx,
 
     if (isVerbose)
         printf("Device opened.\n");
-    //libusb_hotplug_deregister_callback(ctx, hp);
 
     return LIBUSB_SUCCESS;
 }
@@ -292,47 +238,16 @@ static int usbBoot(uint8* buf, int size, int isVerbose)
     return boot_ret;
 }
 
-static int outTofile(const char* fname, const unsigned char* data, unsigned size)
-{
-    FILE* fp;
-    int wr;
-
-    if (!strcmp(fname, "-"))
-        fp = stdout;
-    else {
-        fp = fopen(fname, "w");
-        if (fp == NULL) {
-            perror(fname);
-            return 1;
-        }
-    }
-    while (size) {
-        if ((wr = fwrite(data, 1, size, fp)) < 0) {
-            perror("fwrite");
-            break;
-        }
-        data += wr;
-        size -= wr;
-    }
-    if (fp != stdout)
-        fclose(fp);
-    return size != 0;
-}
-
 static void usage(void)
 {
     printf("\n"
-        "usage: nanopi-load [options...] <bootloader.bin> [<loadaddr> [<startaddr>]]\n"
+        "usage: loader [options...] <bootloader.bin> [<loadaddr> [<startaddr>]]\n"
         "\n"
         "options:\n"
-        "  -b <num> - write the value at \"boot method\" offset (0x57) in NSIH header\n"
-        "  -c - dry run (implies -v)\n"
-        "  -e - pad data with at least one '\\0' byte (for env to import)\n"
-        "  -f - fix load size in Boot Header\n"
         "  -h - print this help\n"
-        "  -o <file> - output result to file instead of upload\n"
         "  -v - be verbose\n"
-        "  -x - add code for iROMBOOT to Boot Header that switches to 64-bit\n"
+        "  -t <32|64> - add code for iROMBOOT for corresponding Boot Header type, 32 or 64 bit respectively\n"
+        "  -o <file> - output result to file instead of upload\n"
         "\n"
         "If <loadaddr> is specified, image is prepended with 512-byte Boot Header\n"
         "If <startaddr> is not specified, assume <loadaddr> + 0x200\n"
@@ -342,43 +257,29 @@ static void usage(void)
 
 int main(int argc, char* argv[])
 {
-    int offset, size, opt;
-    int is64bitBoot = 0, dryRun = 0, isVerbose = 0, fixSize = 0;
-    int bootMethod = -1, isEnv = 0;
-    unsigned int load_addr;
-    unsigned int launch_addr;
+    int size, opt;
+    int headerType = 0, isVerbose = 0;
+    unsigned int load_addr = BOOT_LOADER_LAUNCHADDR_DEFAULT;
+    unsigned int launch_addr = BOOT_LOADER_LAUNCHADDR_DEFAULT;
     const char* infile = NULL, * outfile = NULL;
 
     if (argc == 1) {
         usage();
         return 0;
     }
-    while ((opt = getopt(argc, argv, "b:cefho:vx")) > 0) {
+    while ((opt = getopt(argc, argv, "hvt:o:")) > 0) {
         switch (opt) {
-        case 'b':
-            bootMethod = strtoul(optarg, NULL, 0);
-            break;
-        case 'c':
-            dryRun = 1;
-            isVerbose = 1;
-            break;
-        case 'e':
-            isEnv = 1;
-            break;
-        case 'f':
-            fixSize = 1;
-            break;
         case 'h':
             usage();
             return 0;
-        case 'o':
-            outfile = optarg;
-            break;
         case 'v':
             isVerbose = 1;
             break;
-        case 'x':
-            is64bitBoot = 1;
+        case 't':
+            headerType = (strtoul(optarg, NULL, 10) == 64) ? 64 :32;
+            break;
+        case 'o':
+            outfile = optarg;
             break;
         case '?':
             return 1;
@@ -389,34 +290,48 @@ int main(int argc, char* argv[])
         return 1;
     }
     infile = argv[optind++];
-    offset = argc == optind ? 0 : 0x200;
-    memset(mem, 0, offset);
-    size = readBin(mem + offset, sizeof(mem) - offset, infile, isEnv);
+    size = readBin(mem, sizeof(mem), infile);
     if (size < 0)
         return 1;
     if (argc > optind) {
         load_addr = strtoul(argv[optind++], NULL, 16);
-        launch_addr = load_addr + offset;
+        launch_addr = load_addr + 0x200;
         if (argc > optind)
             launch_addr = strtoul(argv[optind], NULL, 16);
-        initBootloaderHeader(mem, is64bitBoot, size,
-            load_addr, launch_addr, bootMethod);
-        if (isVerbose) {
-            printf("Added Boot Header: load=0x%x, launch=0x%x size=%u%s\n",
-                load_addr, launch_addr, size, is64bitBoot ? " 64-bit" : "");
+    }
+    if (headerType)
+    {
+        // check if header already defined
+        if (!checkBootloaderHeader(mem, size, isVerbose))
+        {
+            if (headerType == 64)
+            {
+                if (readBin(nsih64, sizeof(nsih64), "nsih64.bin") < 0) {
+                    printf("error: 64bit Boot Header not found !");
+                    return 1;
+                }
+            }
+            initBootloaderHeader(mem, nsih64, headerType, size, load_addr, launch_addr);
+            if (isVerbose) {
+                printf("Added Boot Header: load=0x%x, launch=0x%x size=%u%s\n", load_addr, launch_addr, size, headerType == 64 ? " 64-bit" : "32-bit");
+            }
         }
-        size += offset;
-        offset = 0;
+        else
+        {
+            printf("warning: Boot Header already defined!");
+        }
     }
-    else {
-        if (!checkBootloaderHeader(mem, size, isVerbose, fixSize,
-            bootMethod))
+    else
+    {
+        if (!checkBootloaderHeader(mem, size, isVerbose))
+        {
+            printf("error: Boot header not found or incorrect\n");
             return 1;
+        }
     }
-    if (dryRun)
-        return 0;
     if (outfile) {
-        return outTofile(outfile, mem, size);
+       return outTofile(outfile, mem, size);
     }
+
     return usbBoot(mem, size, isVerbose);
 }
