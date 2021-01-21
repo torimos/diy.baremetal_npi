@@ -4,7 +4,6 @@ ifeq ($(strip $(BOARD)),)
 BOARD = nanopim3
 endif
 
-
 include Rules.mk
 
 all: clean init $(OBJS)
@@ -18,6 +17,8 @@ all: clean init $(OBJS)
 
 init:
 	@echo "[BUILD for $(BOARD) started]"
+	@echo "  CCFLAGS = $(CCFLAGS)"
+	@echo "  LDFLAGS = $(LDFLAGS)"
 	@mkdir -p $(OBJ_DIR) && cd $(OBJ_DIR) && mkdir -p $(filter-out $(HOME),$(sort $(dir $(OBJS))))
 
 clean:

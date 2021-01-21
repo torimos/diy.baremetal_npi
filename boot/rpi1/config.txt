@@ -1,0 +1,8 @@
+# For more options and information see
+# http://rpf.io/configtxt
+# Some settings may impact device functionality. See link above for details
+
+gpu_mem=128
+init_uart_clock=3000000
+enable_uart=1
+core_freq=250

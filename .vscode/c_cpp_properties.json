@@ -6,6 +6,7 @@
                 "${workspaceFolder}/core/**"
             ],
             "defines": [
+                "NANOPIM3",
                 "_DEBUG",
                 "UNICODE",
                 "_UNICODE"

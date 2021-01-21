@@ -8,21 +8,26 @@ CPY		= $(CC_PREFIX)objcopy
 DMP		= $(CC_PREFIX)objdump
 NM		= $(CC_PREFIX)nm
 
-ifeq ($(strip $(STDLIB_SUPPORT)),0)
-LIBGCC	  = "$(shell $(CC) $(CCFLAGS) -print-file-name=libgcc.a)"
-LIBC	  = "$(shell $(CC) $(CCFLAGS) -print-file-name=libc.a)"
+CFLAGS 	= -g -Wall -fsigned-char -nostdlib -nostartfiles -ffreestanding $(BOARD_CFLAGS)
+CCFLAGS = $(CFLAGS) -std=c++14 -Wno-aligned-new
+LDFLAGS += -Bstatic \
+			-T$(LINKER_DIR)/$(LINKERFILE) \
+			--start-group \
+			$(LIBS) \
+			$(EXTRALIBS) \
+			--end-group
 
+ifeq ($(strip $(STDLIB_SUPPORT)),0)
+LIBGCC	  = "$(shell $(CXX) $(CCFLAGS) -print-file-name=libgcc.a)"
+LIBC	  = "$(shell $(CXX) $(CCFLAGS) -print-file-name=libc.a)"
 ifneq ($(strip $(LIBGCC)),"libgcc.a")
 EXTRALIBS += $(LIBGCC)
 endif
-
 ifneq ($(strip $(LIBC)),"libc.a")
 EXTRALIBS += $(LIBC)
 endif
-
 CCFLAGS += -fno-exceptions -fno-rtti -nostdinc++
 endif
-
 ifeq ($(strip $(STDLIB_SUPPORT)),1)
 LIBM = "$(shell $(CC) $(CCFLAGS) -print-file-name=libm.a)"
 ifneq ($(strip $(LIBM)),"libm.a")
@@ -34,15 +39,6 @@ ifeq ($(strip $(GC_SECTIONS)),1)
 CFLAGS	+= -ffunction-sections -fdata-sections
 LDFLAGS	+= --gc-sections
 endif
-
-CFLAGS 	= -g -Wall -fsigned-char -nostdlib -nostartfiles -ffreestanding $(BOARD_CFLAGS)
-CCFLAGS = $(CFLAGS) -std=c++14 -Wno-aligned-new
-LDFLAGS += -Bstatic \
-			-T$(LINKER_DIR)/$(LINKERFILE) \
-			--start-group \
-			$(LIBS) \
-			$(EXTRALIBS) \
-			--end-group
 
 define COLLEC_OBJ
 $(foreach item,$(1),$(patsubst $(HOME)/$(item)/%,$(item)/%.o,$(shell find $(HOME)/$(item) -type f \( -iname "*.c" -o -name "*.cpp" -o -name "*.s" -o -name "*.S" \))))

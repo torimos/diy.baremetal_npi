@@ -6,7 +6,7 @@ LINKERFILE 		:= spl.lds
 STDLIB_SUPPORT 	:= 0
 GC_SECTIONS 	:= 0
 
-BOARD_CFLAGS := -mlittle-endian -march=$(ARCH) -mtune=$(CPU)
+BOARD_CFLAGS := -O3 -mlittle-endian -march=$(ARCH) -mtune=$(CPU) -DNANOPIM3
 
 ifeq ($(strip $(AARCH)),64)
 CROSS_COMPILER := aarch64
