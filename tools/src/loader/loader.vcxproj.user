@@ -4,7 +4,7 @@
     <ShowAllFiles>true</ShowAllFiles>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LocalDebuggerCommandArguments>-v -t64 $(TargetDir)\kernel8_nonsih.img</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-v -t64-s$(TargetDir)\nsih64.bin $(TargetDir)\kernel8_nonsih.img</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
 </Project>

@@ -247,6 +247,7 @@ static void usage(void)
         "  -h - print this help\n"
         "  -v - be verbose\n"
         "  -t <32|64> - add code for iROMBOOT for corresponding Boot Header type, 32 or 64 bit respectively\n"
+        "  -s <file> - nsih file\n"
         "  -o <file> - output result to file instead of upload\n"
         "\n"
         "If <loadaddr> is specified, image is prepended with 512-byte Boot Header\n"
@@ -261,13 +262,13 @@ int main(int argc, char* argv[])
     int headerType = 0, isVerbose = 0;
     unsigned int load_addr = BOOT_LOADER_LAUNCHADDR_DEFAULT;
     unsigned int launch_addr = BOOT_LOADER_LAUNCHADDR_DEFAULT;
-    const char* infile = NULL, * outfile = NULL;
+    const char* infile = NULL, * outfile = NULL, * nsihfile = NULL;
 
     if (argc == 1) {
         usage();
         return 0;
     }
-    while ((opt = getopt(argc, argv, "hvt:o:")) > 0) {
+    while ((opt = getopt(argc, argv, "hvt:s:o:")) > 0) {
         switch (opt) {
         case 'h':
             usage();
@@ -277,6 +278,9 @@ int main(int argc, char* argv[])
             break;
         case 't':
             headerType = (strtoul(optarg, NULL, 10) == 64) ? 64 :32;
+            break;
+        case 's':
+            nsihfile = optarg;
             break;
         case 'o':
             outfile = optarg;
@@ -306,8 +310,12 @@ int main(int argc, char* argv[])
         {
             if (headerType == 64)
             {
-                if (readBin(nsih64, sizeof(nsih64), "nsih64.bin") < 0) {
-                    printf("error: 64bit Boot Header not found !");
+                if (nsihfile == NULL) {
+                    printf("error: Boot header file name has not been provided!");
+                    return 1;
+                }
+                if (readBin(nsih64, sizeof(nsih64), nsihfile) < 0) {
+                    printf("error: Boot header file not found !");
                     return 1;
                 }
             }

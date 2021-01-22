@@ -11,7 +11,6 @@
 
 .section ".init" 
 	// Global functions declare
-	.global getCPUID
 	.global boot_master
 	.global boot_slave
 
@@ -21,10 +20,10 @@
 	.align 9
 
 	// space for NSIH
-	.skip 0x800, 0x00
+	.skip 0x200, 0x00
 
-	.global start
-start:
+	.global _start
+_start:
 	b		reset
 
 	.global build_info
@@ -37,7 +36,11 @@ reset:
 							// [1]: IRQ
 							// [0]: FIQ
 
-	bl		getCPUID
+	mrs		x1, MPIDR_EL1
+	and		x0, x1, #0x3	// Get Affinity Level 0
+	lsr		x1, x1, #8
+	and		x1, x1, #0xF	// Get Affinity Level 1
+	orr		x0, x0, x1
 	mov		x29, x0			// Save CPUID to x29
 
 	// Set vectors
