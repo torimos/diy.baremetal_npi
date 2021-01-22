@@ -1,6 +1,6 @@
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
+// #include <string.h>
+// #include <stdlib.h>
+// #include <stdio.h>
 #include "utils.h"
 
 #if defined( NANOPIM3 )
@@ -21,15 +21,15 @@
 
 volatile unsigned int* gpio = (unsigned int*)GPIO_BASE;
 
-void mem_test()
-{
-    int loop;
-    unsigned int* buffer;
-    buffer = (unsigned int*)malloc( 1024 * sizeof( unsigned int ) );
-    for( loop=0; loop<1024; loop++ )
-        buffer[loop] = 0;
-    free(buffer);
-}
+// void mem_test()
+// {
+//     int loop;
+//     unsigned int* buffer;
+//     buffer = (unsigned int*)malloc( 1024 * sizeof( unsigned int ) );
+//     for( loop=0; loop<1024; loop++ )
+//         buffer[loop] = 0;
+//     free(buffer);
+// }
 
 extern "C" void app_main()
 {
@@ -41,7 +41,7 @@ extern "C" void app_main()
     gpio[1] |= (1 << 18); 
     #endif
 
-	mem_test();
+	// mem_test();
 	while (1) {
         
         #if defined( NANOPIM3 )

@@ -145,15 +145,15 @@ prepare_cpu:
 	cmp		x29, xzr
 	bne		0f
 
-	// Make stack for each CPU
-	// CPU0: -0x1c0
-	// CPU1: -0x180
-	// CPU2: -0x140
-	// CPU3: -0x100
-	// CPU4: -0x0c0
-	// CPU5: -0x080
-	// CPU6: -0x040
-	// CPU7: -0x000
+	// Make stack pointers for each CPU (as offset from the end of static RAM = 64K)
+	// CPU0: -STACK_SIZEx7
+	// CPU1: -STACK_SIZEx6
+	// CPU2: -STACK_SIZEx5
+	// CPU3: -STACK_SIZEx4
+	// CPU4: -STACK_SIZEx3
+	// CPU5: -STACK_SIZEx2
+	// CPU6: -STACK_SIZEx1
+	// CPU7: -STACK_SIZEx0
 make_stack:
 	ldr		x0, =INTERNAL_SRAM_BASE
 	add		x0, x0, #INTERNAL_SRAM_SIZE

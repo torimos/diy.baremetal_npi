@@ -6,9 +6,10 @@ CXX		= $(CC_PREFIX)g++
 LD		= $(CC_PREFIX)ld
 CPY		= $(CC_PREFIX)objcopy
 DMP		= $(CC_PREFIX)objdump
+RELF	= $(CC_PREFIX)readelf
 NM		= $(CC_PREFIX)nm
-
-CFLAGS 	= -g -Wall -fsigned-char -nostdlib -nostartfiles -ffreestanding $(BOARD_CFLAGS)
+# -g 
+CFLAGS 	= -Wall -fsigned-char -nostdlib -nostartfiles -ffreestanding $(BOARD_CFLAGS)
 CCFLAGS = $(CFLAGS) -std=c++14 -Wno-aligned-new
 LDFLAGS += -Bstatic \
 			-T$(LINKER_DIR)/$(LINKERFILE) \
