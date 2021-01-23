@@ -11,8 +11,8 @@ all: clean init $(OBJS)
 	@$(LD) -o $(BUILD_DIR)/$(TARGET).elf -Map $(BUILD_DIR)/$(TARGET).map $(patsubst %.o,$(OBJ_DIR)/%.o,$(OBJS)) $(LDFLAGS)
 	@echo " [IMG]  $(TARGET).img"
 	@$(CPY) $(BUILD_DIR)/$(TARGET).elf -O binary $(BUILD_DIR)/$(TARGET).img
-	@echo " [DUMP]  $(TARGET).disasm"
-	@$(DMP) -l -S -D $(BUILD_DIR)/$(TARGET).elf > $(BUILD_DIR)/$(TARGET).disasm
+	@echo " [DUMP]  $(TARGET).lst"
+	@$(DMP) -l -S -D $(BUILD_DIR)/$(TARGET).elf > $(BUILD_DIR)/$(TARGET).lst
 	@echo " [RELF]  $(TARGET).symtab"
 	@$(RELF) -s $(BUILD_DIR)/$(TARGET).elf > $(BUILD_DIR)/$(TARGET).symtab
 	@echo "[BUILD for $(BOARD) finished]"
